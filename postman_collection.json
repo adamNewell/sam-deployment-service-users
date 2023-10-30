@@ -1,0 +1,190 @@
+{
+	"info": {
+		"_postman_id": "1c178a67-bd86-4f05-a33a-443c45195187",
+		"name": "AprilAire",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11132753"
+	},
+	"item": [
+		{
+			"name": "New User",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "apikey",
+					"apikey": [
+						{
+							"key": "key",
+							"value": "x-api-key",
+							"type": "string"
+						},
+						{
+							"key": "value",
+							"value": "{{apiKey}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"john@doe.com\",\n    \"joinDate\": \"2023-10-29\",\n    \"pickleType\": \"Dill\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseURL}}/users",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get User",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseURL}}/users/:email",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"users",
+						":email"
+					],
+					"variable": [
+						{
+							"key": "email",
+							"value": "john@doe.com"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete User",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{baseURL}}/users/:email",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"users",
+						":email"
+					],
+					"variable": [
+						{
+							"key": "email",
+							"value": "john@doe.com"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Favorite Pickle Type",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pickleType\": \"Bread and Butter\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseURL}}/users/:email",
+					"host": [
+						"{{baseURL}}"
+					],
+					"path": [
+						"users",
+						":email"
+					],
+					"variable": [
+						{
+							"key": "email",
+							"value": "john@doe.com"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "{{apiKey}}",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "x-api-key",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseURL",
+			"value": "https://k9zvyduskj.execute-api.us-west-2.amazonaws.com/v1",
+			"type": "string"
+		},
+		{
+			"key": "apiKey",
+			"value": "4E5EtbmDqD8gddD4oaJ1MapS7E0V1vZ95WekYaWN",
+			"type": "string"
+		}
+	]
+}

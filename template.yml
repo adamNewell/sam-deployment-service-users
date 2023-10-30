@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: An Amazon API Gateway REST API that integrates with an Amazon DynamoDB table.
+Parameters:
+  AppName:
+    Type: String
+    Default: api-music
+    Description: Name of application.
+  StageName:
+    Type: String
+    Default: v1
+    Description: Name of API stage.
+Resources:
+  DynamoDBTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: Users
+      AttributeDefinitions:
+        - AttributeName: _pk0 # username, ie. 'user#johndoe@lethargy.com'
+          AttributeType: S
+        - AttributeName: _sk0 # profile information, ie. 'user#johndoe@lethargy.com' [<email>, <join_date>, <favorite_pickle_flavor>]. Could also hold location information via keys like location#1 [<location_uuid>, <visit_count>, etc]
+          AttributeType: S
+      KeySchema:
+        - AttributeName: _pk0
+          KeyType: HASH
+        - AttributeName: _sk0
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+  APIGatewayRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+      Policies:
+        - PolicyName: APIGatewayDynamoDBPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:DeleteItem'
+                # Including * in the resource Arn allows access to the DynamoDB table and indexes
+                Resource: !Sub
+                  - '${varTableArn}*'
+                  - varTableArn: !GetAtt DynamoDBTable.Arn
+  
+  RequestDataModel:
+    Type: 'AWS::ApiGateway::Model'
+    Properties:
+      Name: 'UserModel'
+      RestApiId: !Ref Api
+      ContentType: application/json
+      Schema:
+        title: 'UserModel'
+        required:
+          - 'email'
+          - 'joinDate'
+          - 'pickleType'
+        type: 'object'
+        items:
+          type: 'object'
+          properties:
+            'email':
+              type: 'string'
+            'joinDate':
+              type: 'string'
+            'pickleType':
+              type: 'string'
+              # enum: ['breadnbutter']
+
+  PatchRequestModel:
+    Type: 'AWS::ApiGateway::Model'
+    Properties:
+      Name: 'PatchModel'
+      RestApiId: !Ref Api
+      ContentType: application/json
+      Schema:
+        title: 'UserModel'
+        required:
+          - 'email'
+          - 'pickleType'
+        type: 'object'
+        items:
+          type: 'object'
+          properties:
+            'email':
+              type: 'string'
+            'pickleType':
+              type: 'string'
+              # enum: ['breadnbutter']
+
+  Api:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: !Sub '${AppName}'
+      ApiKeySourceType: HEADER
+  UserResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !GetAtt Api.RootResourceId
+      PathPart: 'users'
+  UsersEmailResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref Api
+      ParentId: !Ref UserResource
+      PathPart: '{email}'
+
+  GetDeleteValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      Name: "Param Validator"
+      RestApiId: !Ref Api
+      ValidateRequestParameters: true
+
+  PostValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      Name: "Body Validator"
+      RestApiId: !Ref Api
+      ValidateRequestBody: true
+
+  PatchValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      Name: "Body and Param Validator"
+      RestApiId: !Ref Api
+      ValidateRequestBody: true
+      ValidateRequestParameters: true
+      
+  UserMethodPost:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref UserResource
+      HttpMethod: POST
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestValidatorId: !Ref PostValidator
+      RequestModels:
+        application/json: !Ref RequestDataModel
+      Integration:
+        Type: AWS
+        Credentials: !GetAtt APIGatewayRole.Arn
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: >
+            {
+              "TableName":"Users",
+              "Item": {
+                "_pk0": {
+                  "S": "user#$input.path('$.email')"
+                },
+                "_sk0": {
+                  "S":"user#$input.path('$.email')"
+                },
+                "email": {
+                  "S": "$input.path('$.email')"
+                },
+                "join_date": {
+                  "S": "$input.path('$.joinDate')"
+                },
+                "pickle_type": {
+                  "S": "$input.path('$.pickleType')"
+                }
+              }
+            }
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: "{}"
+      MethodResponses:
+        - StatusCode: '200'
+
+  UserEmailMethodGet:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref UsersEmailResource
+      HttpMethod: GET
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestValidatorId: !Ref GetDeleteValidator
+      Integration:
+        Type: AWS
+        Credentials: !GetAtt APIGatewayRole.Arn
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:dynamodb:action/Query'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: >
+            {
+              "TableName": "Users",
+              "KeyConditionExpression": "#pk0 = :id AND #sk0 = :id",
+              "ExpressionAttributeValues": {
+                ":id": {
+                  "S": "user#$util.urlDecode($input.params('email'))"
+                }
+              },
+              "ExpressionAttributeNames": {
+                "#pk0": "_pk0",
+                "#sk0": "_sk0"
+              }
+            }
+
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: >
+                #set($inputRoot = $input.path('$'))
+                {"users": [ #foreach($field in $inputRoot.Items)
+                  {
+                    "email": "$field.email.S",
+                    "join_date": "$field.join_date.S",
+                    "pickle_type": "$field.pickle_type.S"
+                  } #if($foreach.hasNext),#end#end ]
+                }
+      MethodResponses:
+        - StatusCode: '200'
+
+  UsersEmailMethodPatch:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref UsersEmailResource
+      HttpMethod: PATCH
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestValidatorId: !Ref PatchValidator
+      RequestModels:
+        application/json: !Ref PatchRequestModel
+      Integration:
+        Type: AWS
+        Credentials: !GetAtt APIGatewayRole.Arn
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:dynamodb:action/UpdateItem"
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: >
+            {
+              "TableName":"Users",
+              "Key": {
+                "_pk0": {
+                  "S": "user#$input.params('email')"
+                },
+                "_sk0": {
+                  "S": "user#$input.params('email')"
+                }
+              },
+              "UpdateExpression": "SET pickle_type = :val",
+              "ExpressionAttributeValues": {
+                ":val": {
+                  "S": "$input.path('$.pickleType')"
+                }
+              }
+            }
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseTemplates:
+              application/json: "{}"
+          - StatusCode: "400"
+      MethodResponses:
+        - StatusCode: "200"
+        - StatusCode: "400"
+
+  UsersEmailMethodDelete:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref UsersEmailResource
+      HttpMethod: DELETE
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      RequestValidatorId: !Ref GetDeleteValidator
+      RequestParameters:
+        method.request.path.email: true
+      Integration:
+        Type: AWS
+        Credentials: !GetAtt APIGatewayRole.Arn
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:dynamodb:action/DeleteItem"
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestParameters:
+          integration.request.path.email: method.request.path.email
+        RequestTemplates:
+          application/json: >
+            {
+              "TableName":"Users",
+              "Key": {
+                "_pk0": {
+                  "S": "user#$input.params('email')"
+                },
+                "_sk0": {
+                  "S": "user#$input.params('email')"
+                }
+              }
+            }
+        IntegrationResponses:
+          - StatusCode: "200"
+          - StatusCode: "400"
+      MethodResponses:
+        - StatusCode: "200"
+        - StatusCode: "400"
+
+  ApiDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    DependsOn:
+      - UserEmailMethodGet
+    Properties:
+      RestApiId: !Ref Api
+      StageName: !Sub '${StageName}'
+  ApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    DependsOn:
+      - ApiDeployment
+    Properties:
+      Enabled: true
+      Name: !Sub '${AppName}-apikey'
+      StageKeys:
+        - RestApiId: !Ref Api
+          StageName: !Sub '${StageName}'
+  ApiUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    DependsOn:
+      - ApiDeployment
+    Properties:
+      ApiStages:
+        - ApiId: !Ref Api
+          Stage: !Sub '${StageName}'
+      Throttle:
+        RateLimit: 500
+        BurstLimit: 1000
+      UsagePlanName: !Sub '${AppName}-usage-plan'
+      Quota:
+        Limit: 10000
+        Period: MONTH
+  ApiUsagePlanKey:
+    Type: 'AWS::ApiGateway::UsagePlanKey'
+    Properties:
+      KeyType: API_KEY
+      KeyId: !Ref ApiKey
+      UsagePlanId: !Ref ApiUsagePlan
+Outputs:
+  ApiRootUrl:
+    Description: Root Url of the API
+    Value: !Sub 
+      - 'https://${ApiId}.execute-api.${AWS::Region}.amazonaws.com/${StageName}'
+      - ApiId: !Ref Api
+  ApiKeyId:
+    Description: API Key Id
+    Value: !Ref ApiKey
+  CLIApiKey:
+    Description: CLI command to get the api key value
+    Value: !Sub "aws apigateway get-api-key --api-key ${ApiKey.APIKeyId} --include-value --query \"value\" --output text"

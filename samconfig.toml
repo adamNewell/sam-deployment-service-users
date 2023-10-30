@@ -1,0 +1,9 @@
+version = 1.0.0
+[default.deploy.parameters]
+stack_name = "test"
+resolve_s3 = true
+s3_prefix = "test"
+region = "us-west-2"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
