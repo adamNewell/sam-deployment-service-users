@@ -3,7 +3,7 @@ Description: An Amazon API Gateway REST API that integrates with an Amazon Dynam
 Parameters:
   AppName:
     Type: String
-    Default: api-music
+    Default: users-api
     Description: Name of application.
   StageName:
     Type: String
@@ -79,27 +79,6 @@ Resources:
               type: 'string'
               # enum: ['breadnbutter']
 
-  PatchRequestModel:
-    Type: 'AWS::ApiGateway::Model'
-    Properties:
-      Name: 'PatchModel'
-      RestApiId: !Ref Api
-      ContentType: application/json
-      Schema:
-        title: 'UserModel'
-        required:
-          - 'email'
-          - 'pickleType'
-        type: 'object'
-        items:
-          type: 'object'
-          properties:
-            'email':
-              type: 'string'
-            'pickleType':
-              type: 'string'
-              # enum: ['breadnbutter']
-
   Api:
     Type: 'AWS::ApiGateway::RestApi'
     Properties:
@@ -118,26 +97,20 @@ Resources:
       ParentId: !Ref UserResource
       PathPart: '{email}'
 
-  GetDeleteValidator:
-    Type: AWS::ApiGateway::RequestValidator
-    Properties:
-      Name: "Param Validator"
-      RestApiId: !Ref Api
-      ValidateRequestParameters: true
-
-  PostValidator:
+  BodyValidator:
     Type: AWS::ApiGateway::RequestValidator
     Properties:
       Name: "Body Validator"
       RestApiId: !Ref Api
       ValidateRequestBody: true
+      ValidateRequestParameters: false
 
-  PatchValidator:
+  ParamValidator:
     Type: AWS::ApiGateway::RequestValidator
     Properties:
-      Name: "Body and Param Validator"
+      Name: "Param Validator"
       RestApiId: !Ref Api
-      ValidateRequestBody: true
+      ValidateRequestBody: false
       ValidateRequestParameters: true
       
   UserMethodPost:
@@ -148,7 +121,7 @@ Resources:
       HttpMethod: POST
       ApiKeyRequired: true
       AuthorizationType: NONE
-      RequestValidatorId: !Ref PostValidator
+      RequestValidatorId: !Ref BodyValidator
       RequestModels:
         application/json: !Ref RequestDataModel
       Integration:
@@ -194,7 +167,9 @@ Resources:
       HttpMethod: GET
       ApiKeyRequired: true
       AuthorizationType: NONE
-      RequestValidatorId: !Ref GetDeleteValidator
+      RequestValidatorId: !Ref ParamValidator
+      RequestParameters:
+           method.request.path.email: true
       Integration:
         Type: AWS
         Credentials: !GetAtt APIGatewayRole.Arn
@@ -240,9 +215,10 @@ Resources:
       HttpMethod: PATCH
       ApiKeyRequired: true
       AuthorizationType: NONE
-      RequestValidatorId: !Ref PatchValidator
-      RequestModels:
-        application/json: !Ref PatchRequestModel
+      RequestValidatorId: !Ref ParamValidator
+      RequestParameters:
+           method.request.path.email: true
+           method.request.querystring.pickleType: true
       Integration:
         Type: AWS
         Credentials: !GetAtt APIGatewayRole.Arn
@@ -264,7 +240,7 @@ Resources:
               "UpdateExpression": "SET pickle_type = :val",
               "ExpressionAttributeValues": {
                 ":val": {
-                  "S": "$input.path('$.pickleType')"
+                  "S": "$input.params('pickleType')"
                 }
               }
             }
@@ -285,7 +261,7 @@ Resources:
       HttpMethod: DELETE
       ApiKeyRequired: true
       AuthorizationType: NONE
-      RequestValidatorId: !Ref GetDeleteValidator
+      RequestValidatorId: !Ref ParamValidator
       RequestParameters:
         method.request.path.email: true
       Integration:

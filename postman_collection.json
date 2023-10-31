@@ -111,23 +111,20 @@
 			"request": {
 				"method": "PATCH",
 				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"pickleType\": \"Bread and Butter\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
 				"url": {
-					"raw": "{{baseURL}}/users/:email",
+					"raw": "{{baseURL}}/users/:email?pickleType=Bread and Butter",
 					"host": [
 						"{{baseURL}}"
 					],
 					"path": [
 						"users",
 						":email"
+					],
+					"query": [
+						{
+							"key": "pickleType",
+							"value": "Bread and Butter"
+						}
 					],
 					"variable": [
 						{
@@ -178,12 +175,12 @@
 	"variable": [
 		{
 			"key": "baseURL",
-			"value": "https://k9zvyduskj.execute-api.us-west-2.amazonaws.com/v1",
+			"value": "",
 			"type": "string"
 		},
 		{
 			"key": "apiKey",
-			"value": "4E5EtbmDqD8gddD4oaJ1MapS7E0V1vZ95WekYaWN",
+			"value": "",
 			"type": "string"
 		}
 	]
